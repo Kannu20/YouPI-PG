@@ -11,6 +11,7 @@
     const STORAGE_KEY_ACTIVE = 'youpi.customer.activeId';
     const MAX_IDENTITY_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (maximum 1 week)
 
+    // Client-side obfuscation layer for localStorage to prevent casual/cleartext inspection of customer tokens
     function encryptClientStorage(plainText) {
       if (!plainText) return '';
       try {
@@ -1225,8 +1226,18 @@
       }
     }
 
+    function renderCodButton(btn, amount) {
+      if (!btn) return;
+      btn.disabled = false;
+      btn.textContent = '';
+      const span = document.createElement('span');
+      span.textContent = 'Confirm & Place COD Order (₹' + (amount || '0.00') + ')';
+      btn.appendChild(span);
+      btn.appendChild(document.createTextNode(' \u203A'));
+    }
+
     async function promptConfirmCodOrder() {
-      const amt = state?.amount || '' + (state?.amount || "0.00") + '';
+      const amt = state?.amount || '0.00';
       if (!confirm(`Are you sure you want to confirm and place this Cash on Delivery (COD) order for ₹${amt}? You will pay in cash upon doorstep delivery.`)) {
         return;
       }
@@ -1250,25 +1261,11 @@
           loadState();
         } else {
           alert(data.error || 'Failed to place COD order');
-          if (btn) {
-            btn.disabled = false;
-            btn.textContent = '';
-            const span = document.createElement('span');
-            span.textContent = 'Confirm & Place COD Order (₹' + (state?.amount || '0.00') + ')';
-            btn.appendChild(span);
-            btn.appendChild(document.createTextNode(' \u203A'));
-          }
+          renderCodButton(btn, state?.amount);
         }
       } catch (e) {
         alert('Network error confirming COD order.');
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = '';
-          const span = document.createElement('span');
-          span.textContent = 'Confirm & Place COD Order (₹' + (state?.amount || '0.00') + ')';
-          btn.appendChild(span);
-          btn.appendChild(document.createTextNode(' \u203A'));
-        }
+        renderCodButton(btn, state?.amount);
       }
     }
 
