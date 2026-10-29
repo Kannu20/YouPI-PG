@@ -2,7 +2,7 @@
 
 This document establishes the mandatory architectural rules, Git workflows, security standards, and payment lifecycle invariants for both AI coding agents and human engineers contributing to or integrating with **YOUPI PG V2**.
 
----
+--
 
 ## Part 1: AI & Developer Operating Standard
 
