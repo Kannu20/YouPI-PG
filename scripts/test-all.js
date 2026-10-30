@@ -16,6 +16,7 @@ const testFiles = [
   'packages/core/src/__tests__/queue-timing.test.js',
   'packages/core/src/__tests__/timing-transition-failure.test.js',
   'packages/core/src/__tests__/webhook-engine.test.js',
+  'packages/core/src/__tests__/webhook-outbox-outcomes.test.js',
   'packages/merchant-sdk/src/__tests__/merchant-sdk.test.js',
   'packages/merchant-sdk/src/__tests__/youpi-universal-integration.test.js',
   'packages/core/src/__tests__/cancel-timer-failure.test.js',
