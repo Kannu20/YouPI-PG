@@ -47,8 +47,16 @@ export class ObservationRepository {
     return this.mapRow(row);
   }
 
-  findByFingerprint(fingerprintHash) {
-    const row = this.db.queryOne('SELECT * FROM payment_observations WHERE fingerprint_hash = ?', [fingerprintHash]);
+  /**
+   * @param {string} fingerprintHash
+   * @param {string} [source] Restrict to one channel. A UTR fingerprint is shared by every
+   *   channel, so after a cross-channel upgrade the unfiltered lookup may return another
+   *   channel's row and hide a same-channel replay.
+   */
+  findByFingerprint(fingerprintHash, source) {
+    const row = source
+      ? this.db.queryOne('SELECT * FROM payment_observations WHERE fingerprint_hash = ? AND source = ? LIMIT 1', [fingerprintHash, source])
+      : this.db.queryOne('SELECT * FROM payment_observations WHERE fingerprint_hash = ?', [fingerprintHash]);
     if (!row) return null;
     return this.mapRow(row);
   }

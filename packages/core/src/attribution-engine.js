@@ -120,7 +120,10 @@ export class AttributionEngine {
     }
 
     // Tier 1: Check fingerprint for deduplication
-    const existing = this.obsRepo.findByFingerprint(normalizedObs.fingerprintHash);
+    // Look up this channel first: once a second channel has upgraded the payment, the
+    // fingerprint has one row per channel and the unfiltered lookup may return the other one.
+    const existing = this.obsRepo.findByFingerprint(normalizedObs.fingerprintHash, normalizedObs.source)
+      || this.obsRepo.findByFingerprint(normalizedObs.fingerprintHash);
     if (existing) {
       // If observation came from the SAME source, drop as redundant duplicate
       if (existing.source === normalizedObs.source) {

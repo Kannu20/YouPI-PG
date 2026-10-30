@@ -335,6 +335,69 @@ describe('Phase 9A Fail-Closed Payment Attribution Hardening Suite', () => {
     assert.equal(successEvents.length, 1);
   });
 
+  test('7b. Same-channel replay after a cross-channel upgrade: rejected as DUPLICATE_OBSERVATION', () => {
+    const session = sessionRepo.create({
+      merchantId: merchantA.id,
+      receivingAccountId: accountA.id,
+      orderId: 'ORD-REPLAY-AFTER-UPGRADE',
+      amountPaise: 10000n
+    });
+    sessionRepo.acquireSlotAtomic(session.id, accountA.id, 300000);
+    const sms = {
+      source: 'SMS',
+      rawText: 'Received Rs 100.00 on UPI. Ref: 777777000222',
+      sender: 'YESBNK',
+      receivingAccountId: accountA.id
+    };
+
+    // Gmail first, then SMS: the legitimate Level 2 upgrade. The UTR fingerprint now has a
+    // GMAIL row and an SMS_GATEWAY row, and the GMAIL row is the one an unfiltered lookup finds.
+    assert.equal(pipeline.process({
+      source: 'GMAIL',
+      rawText: 'Received Rs 100.00 on UPI. Ref: 777777000222',
+      sender: 'alerts@yes.bank.in',
+      receivingAccountId: accountA.id
+    }).status, 'VERIFIED');
+    assert.equal(pipeline.process(sms).status, 'VERIFIED');
+    assert.equal(sessionRepo.findById(session.id).verificationLevel, 2);
+    const upgradesBefore = emittedEvents.filter(e => e.event === 'PAYMENT.VERIFICATION_UPGRADED').length;
+
+    // The observer delivers the same SMS again (retry, or SMS + notification for one credit).
+    const replay = pipeline.process(sms);
+
+    assert.equal(replay.status, 'REJECTED');
+    assert.equal(replay.failingCondition, 'DUPLICATE_OBSERVATION');
+    const rows = db.query('SELECT source FROM payment_observations WHERE bank_reference_number = ?', ['777777000222']);
+    assert.deepEqual(rows.map(r => r.source).sort(), [ObserverSource.GMAIL, ObserverSource.SMS_GATEWAY]);
+    assert.equal(emittedEvents.filter(e => e.event === 'PAYMENT.VERIFICATION_UPGRADED').length, upgradesBefore);
+    assert.equal(sessionRepo.findById(session.id).status, PaymentStatus.OBSERVED_SUCCESS);
+  });
+
+  test('7c. Attribution engine drops a same-channel replay even when another channel owns the first row', () => {
+    const session = sessionRepo.create({
+      merchantId: merchantA.id,
+      receivingAccountId: accountA.id,
+      orderId: 'ORD-ENGINE-REPLAY',
+      amountPaise: 10000n
+    });
+    sessionRepo.acquireSlotAtomic(session.id, accountA.id, 300000);
+    const observe = (source) => attributionEngine.processObservation(ObservationNormalizer.normalize({
+      receivingAccountId: accountA.id,
+      source,
+      amountPaise: 10000n,
+      bankReferenceNumber: '777777000333',
+      observedAt: new Date()
+    }));
+
+    assert.equal(observe(ObserverSource.GMAIL).attributed, true);
+    assert.equal(observe(ObserverSource.SMS_GATEWAY).attributed, true);
+    const replay = observe(ObserverSource.SMS_GATEWAY);
+
+    assert.equal(replay.duplicate, true);
+    assert.equal(replay.outcomeStatus, ObservationAttributionStatus.DUPLICATE_IGNORED);
+    assert.equal(db.queryOne('SELECT COUNT(*) AS n FROM payment_observations WHERE bank_reference_number = ?', ['777777000333']).n, 2);
+  });
+
   test('8. Concurrent checkout creation: queue and session state remain atomic and consistent', () => {
     // 3 concurrent checkouts on same receiving account
     const s1 = sessionRepo.create({

@@ -759,8 +759,8 @@ export class PaymentVerificationPipeline {
       observedAt: receivedAt
     });
 
-    const existingObs = this.obsRepo.findByFingerprint(fingerprint);
-    if (existingObs && existingObs.source === observerSourceEnum) {
+    const existingObs = this.obsRepo.findByFingerprint(fingerprint, observerSourceEnum);
+    if (existingObs) {
       stage4 = {
         stage: 4,
         name: 'VERIFICATION',
